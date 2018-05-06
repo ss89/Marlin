@@ -1077,7 +1077,7 @@ void Temperature::updateTemperaturesFromRawValues() {
   #if ENABLED(HEATER_3_USES_MAX6675)
     current_temperature_raw[3] = read_max6675(3);
   #endif
-  HOTEND_LOOP() {
+  HOTEND_LOOP()
     current_temperature[e] = Temperature::analog2temp(current_temperature_raw[e], e);
   #if HAS_HEATED_BED
     current_temperature_bed = Temperature::analog2tempBed(current_temperature_bed_raw);
@@ -1135,7 +1135,7 @@ void Temperature::updateTemperaturesFromRawValues() {
   #endif
   SPI<MAX6675_DO_PIN, MOSI_PIN, MAX6675_SCK_PIN> max6675_spi;
 #endif
-}
+
 /**
  * Initialize the temperature manager
  * The manager is implemented by periodic calls to manage_heater()
