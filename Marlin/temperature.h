@@ -610,8 +610,8 @@ class Temperature {
 
     static void updateTemperaturesFromRawValues();
 
-    #if ENABLED(HEATER_0_USES_MAX6675)
-      static int read_max6675();
+    #if HAS_MAX6675
+      static int read_max6675(uint8_t e);
     #endif
 
     static void checkExtruderAutoFans();

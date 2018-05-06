@@ -1036,7 +1036,7 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
  */
 #if !HAS_HEATER_0
   #error "HEATER_0_PIN not defined for this board."
-#elif !PIN_EXISTS(TEMP_0) && !(defined(MAX6675_SS) && MAX6675_SS >= 0)
+#elif !PIN_EXISTS(TEMP_0) && !(defined(HEATER_0_MAX6675_SS) && HEATER_0_MAX6675_SS >= 0)
   #error "TEMP_0_PIN not defined for this board."
 #elif ((defined(__AVR_ATmega644P__) || defined(__AVR_ATmega1284P__)) && (!PIN_EXISTS(E0_STEP) || !PIN_EXISTS(E0_DIR)))
   #error "E0_STEP_PIN or E0_DIR_PIN not defined for this board."
@@ -1047,8 +1047,8 @@ static_assert(X_MAX_LENGTH >= X_BED_SIZE && Y_MAX_LENGTH >= Y_BED_SIZE,
 #endif
 
 // Pins are required for heaters
-#if ENABLED(HEATER_0_USES_MAX6675) && !(defined(MAX6675_SS) && MAX6675_SS >= 0)
-  #error "MAX6675_SS (required for TEMP_SENSOR_0) not defined for this board."
+#if ENABLED(HEATER_0_USES_MAX6675) && !(defined(HEATER_0_MAX6675_SS) && HEATER_0_MAX6675_SS >= 0)
+  #error "HEATER_0_MAX6675_SS (required for TEMP_SENSOR_0) not defined for this board."
 #elif (HOTENDS > 1 || ENABLED(HEATERS_PARALLEL)) && !HAS_HEATER_1
   #error "HEATER_1_PIN not defined for this board."
 #endif

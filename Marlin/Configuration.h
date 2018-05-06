@@ -260,8 +260,8 @@
  * Temperature sensors available:
  *
  *    -4 : thermocouple with AD8495
- *    -3 : thermocouple with MAX31855 (only for sensor 0)
- *    -2 : thermocouple with MAX6675 (only for sensor 0)
+ *    -3 : thermocouple with MAX31855 (only for hotends, not mixable with MAX6675)
+ *    -2 : thermocouple with MAX6675 (only for hotends, not mixable with MAX31855)
  *    -1 : thermocouple with AD595
  *     0 : not used
  *     1 : 100k thermistor - best choice for EPCOS 100k (4.7k pullup)

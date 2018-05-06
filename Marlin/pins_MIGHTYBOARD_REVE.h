@@ -139,7 +139,7 @@
 #define THERMO_CS1           5   // E3
 #define THERMO_CS2           2   // E4
 
-#define MAX6675_SS          THERMO_CS1
+#define HEATER_0_MAX6675_SS          THERMO_CS1
 #define MAX6675_SCK_PIN     THERMO_SCK_PIN
 #define MAX6675_DO_PIN      THERMO_DO_PIN
 //

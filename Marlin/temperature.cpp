@@ -32,7 +32,7 @@
 #include "language.h"
 #include "printcounter.h"
 
-#if ENABLED(HEATER_0_USES_MAX6675)
+#if ENABLED(HEATER_0_USES_MAX6675) || ENABLED(HEATER_1_USES_MAX6675) || ENABLED(HEATER_2_USES_MAX6675) || ENABLED(HEATER_3_USES_MAX6675)
   #include "MarlinSPI.h"
 #endif
 
@@ -784,9 +784,22 @@ void Temperature::manage_heater() {
 
   updateTemperaturesFromRawValues(); // also resets the watchdog
 
+  #define TEST_TEMP_ERR(N) do{ \
+    if (current_temperature[N] > min(HEATER_##N##_MAXTEMP, HEATER_##N##_MAX6675_TMAX - 1)) max_temp_error(N); \
+    if (current_temperature[N] < max(HEATER_##N##_MINTEMP, HEATER_##N##_MAX6675_TMIN + 0.01)) min_temp_error(N); \
+  }while(0)
+
   #if ENABLED(HEATER_0_USES_MAX6675)
-    if (current_temperature[0] > min(HEATER_0_MAXTEMP, MAX6675_TMAX - 1.0)) max_temp_error(0);
-    if (current_temperature[0] < max(HEATER_0_MINTEMP, MAX6675_TMIN + .01)) min_temp_error(0);
+    TEST_TEMP_ERR(0);
+  #endif
+  #if ENABLED(HEATER_1_USES_MAX6675)
+    TEST_TEMP_ERR(1);
+  #endif
+  #if ENABLED(HEATER_2_USES_MAX6675)
+    TEST_TEMP_ERR(2);
+  #endif
+  #if ENABLED(HEATER_3_USES_MAX6675)
+    TEST_TEMP_ERR(3);
   #endif
 
   #if WATCH_HOTENDS || WATCH_THE_BED || DISABLED(PIDTEMPBED) || HAS_AUTO_FAN || HEATER_IDLE_HANDLER
@@ -929,14 +942,27 @@ float Temperature::analog2temp(const int raw, const uint8_t e) {
       return 0.0;
     }
 
-  #if ENABLED(HEATER_0_USES_MAX6675)
-    if (e == 0) return 0.25 * raw;
+  #if HAS_MAX6675
+    switch (e) {
+      default: break;
+      #if ENABLED(HEATER_0_USES_MAX6675)
+        case 0:
+      #endif
+      #if ENABLED(HEATER_1_USES_MAX6675)
+        case 1:
+      #endif
+      #if ENABLED(HEATER_2_USES_MAX6675)
+        case 2:
+      #endif
+      #if ENABLED(HEATER_3_USES_MAX6675)
+        case 3:
+      #endif
+      return 0.25 * raw;
+    }
   #endif
 
   // Thermistor with conversion table?
   if (heater_ttbl_map[e] != NULL) {
-    float celsius = 0;
-    uint8_t i;
     short(*tt)[][2] = (short(*)[][2])(heater_ttbl_map[e]);
     for (uint8_t i = 1; i < heater_ttbllen_map[e]; i++) {
       const short entry10 = PGM_RD_W((*tt)[i][0]);
@@ -1040,9 +1066,18 @@ float Temperature::analog2temp(const int raw, const uint8_t e) {
  */
 void Temperature::updateTemperaturesFromRawValues() {
   #if ENABLED(HEATER_0_USES_MAX6675)
-    current_temperature_raw[0] = read_max6675();
+    current_temperature_raw[0] = read_max6675(0);
   #endif
-  HOTEND_LOOP()
+  #if ENABLED(HEATER_1_USES_MAX6675)
+    current_temperature_raw[1] = read_max6675(1);
+  #endif
+  #if ENABLED(HEATER_2_USES_MAX6675)
+    current_temperature_raw[2] = read_max6675(2);
+  #endif
+  #if ENABLED(HEATER_3_USES_MAX6675)
+    current_temperature_raw[3] = read_max6675(3);
+  #endif
+  HOTEND_LOOP() {
     current_temperature[e] = Temperature::analog2temp(current_temperature_raw[e], e);
   #if HAS_HEATED_BED
     current_temperature_bed = Temperature::analog2tempBed(current_temperature_bed_raw);
@@ -1091,7 +1126,7 @@ void Temperature::updateTemperaturesFromRawValues() {
 
 #endif
 
-#if ENABLED(HEATER_0_USES_MAX6675)
+#if ENABLED(HEATER_0_USES_MAX6675) || ENABLED(HEATER_1_USES_MAX6675) || ENABLED(HEATER_2_USES_MAX6675) || ENABLED(HEATER_3_USES_MAX6675)
   #ifndef MAX6675_SCK_PIN
     #define MAX6675_SCK_PIN SCK_PIN
   #endif
@@ -1100,7 +1135,7 @@ void Temperature::updateTemperaturesFromRawValues() {
   #endif
   SPI<MAX6675_DO_PIN, MOSI_PIN, MAX6675_SCK_PIN> max6675_spi;
 #endif
-
+}
 /**
  * Initialize the temperature manager
  * The manager is implemented by periodic calls to manage_heater()
@@ -1160,18 +1195,29 @@ void Temperature::init() {
     #endif
   #endif
 
+#if ENABLED(HEATER_0_USES_MAX6675) || ENABLED(HEATER_1_USES_MAX6675) || ENABLED(HEATER_2_USES_MAX6675) || ENABLED(HEATER_3_USES_MAX6675)
+
+  OUT_WRITE(SCK_PIN, LOW);
+  OUT_WRITE(MOSI_PIN, HIGH);
+  max6675_spi.init();
+  OUT_WRITE(SS_PIN, HIGH);
+
   #if ENABLED(HEATER_0_USES_MAX6675)
+    OUT_WRITE(HEATER_0_MAX6675_SS, HIGH);
+  #endif //HEATER_0_USES_MAX6675
 
-    OUT_WRITE(SCK_PIN, LOW);
-    OUT_WRITE(MOSI_PIN, HIGH);
-    SET_INPUT_PULLUP(MISO_PIN);
+  #if ENABLED(HEATER_1_USES_MAX6675)
+    OUT_WRITE(HEATER_1_MAX6675_SS, HIGH);
+  #endif //HEATER_1_USES_MAX6675
 
-    max6675_spi.init();
+  #if ENABLED(HEATER_2_USES_MAX6675)
+    OUT_WRITE(HEATER_2_MAX6675_SS, HIGH);
+  #endif //HEATER_2_USES_MAX6675
 
-    OUT_WRITE(SS_PIN, HIGH);
-    OUT_WRITE(MAX6675_SS, HIGH);
-
-  #endif // HEATER_0_USES_MAX6675
+  #if ENABLED(HEATER_3_USES_MAX6675)
+    OUT_WRITE(HEATER_3_MAX6675_SS, HIGH);
+  #endif //HEATER_3_USES_MAX6675
+#endif //ENABLED(HEATER_0_USES_MAX6675) || ENABLED(HEATER_1_USES_MAX6675) || ENABLED(HEATER_2_USES_MAX6675) || ENABLED(HEATER_3_USES_MAX6675)
 
   #ifdef DIDR2
     #define ANALOG_SELECT(pin) do{ if (pin < 8) SBI(DIDR0, pin); else SBI(DIDR2, pin & 0x07); }while(0)
@@ -1583,31 +1629,136 @@ void Temperature::disable_all_heaters() {
 
 #endif // PROBING_HEATERS_OFF
 
-#if ENABLED(HEATER_0_USES_MAX6675)
+#if ENABLED(HEATER_0_USES_MAX6675) || ENABLED(HEATER_1_USES_MAX6675) || ENABLED(HEATER_2_USES_MAX6675) || ENABLED(HEATER_3_USES_MAX6675)
 
   #define MAX6675_HEAT_INTERVAL 250u
 
-  #if ENABLED(MAX6675_IS_MAX31855)
-    uint32_t max6675_temp = 2000;
-    #define MAX6675_ERROR_MASK 7
-    #define MAX6675_DISCARD_BITS 18
-    #define MAX6675_SPEED_BITS (_BV(SPR1)) // clock ÷ 64
-  #else
-    uint16_t max6675_temp = 2000;
-    #define MAX6675_ERROR_MASK 4
-    #define MAX6675_DISCARD_BITS 3
-    #define MAX6675_SPEED_BITS (_BV(SPR0)) // clock ÷ 16
+  #if ENABLED(HEATER_0_USES_MAX6675)
+    #if ENABLED(HEATER_0_MAX6675_IS_MAX31855)
+      uint32_t max6675_h0_temp = 2000;
+      #define HEATER_0_MAX6675_ERROR_MASK 7
+      #define HEATER_0_MAX6675_DISCARD_BITS 18
+      #define HEATER_0_MAX6675_SPEED_BITS (_BV(SPR1)) // clock ÷ 64
+    #else
+      uint16_t max6675_h0_temp = 2000;
+      #define HEATER_0_MAX6675_ERROR_MASK 4
+      #define HEATER_0_MAX6675_DISCARD_BITS 3
+      #define HEATER_0_MAX6675_SPEED_BITS (_BV(SPR0)) // clock ÷ 16
+    #endif
   #endif
 
-  int Temperature::read_max6675() {
+  #if ENABLED(HEATER_1_USES_MAX6675)
+    #if ENABLED(HEATER_1_MAX6675_IS_MAX31855)
+      uint32_t max6675_h1_temp = 2000;
+      #define HEATER_1_MAX6675_ERROR_MASK 7
+      #define HEATER_1_MAX6675_DISCARD_BITS 18
+      #define HEATER_1_MAX6675_SPEED_BITS (_BV(SPR1))
+    #else
+      uint16_t max6675_h1_temp = 2000;
+      #define HEATER_1_MAX6675_ERROR_MASK 4
+      #define HEATER_1_MAX6675_DISCARD_BITS 3
+      #define HEATER_1_MAX6675_SPEED_BITS (_BV(SPR0))
+    #endif
+  #endif
 
-    static millis_t next_max6675_ms = 0;
+  #if ENABLED(HEATER_2_USES_MAX6675)
+    #if ENABLED(HEATER_2_MAX6675_IS_MAX31855)
+      uint32_t max6675_h2_temp = 2000;
+      #define HEATER_2_MAX6675_ERROR_MASK 7
+      #define HEATER_2_MAX6675_DISCARD_BITS 18
+      #define HEATER_2_MAX6675_SPEED_BITS (_BV(SPR1))
+    #else
+      uint16_t max6675_h2_temp = 2000;
+      #define HEATER_2_MAX6675_ERROR_MASK 4
+      #define HEATER_2_MAX6675_DISCARD_BITS 3
+      #define HEATER_2_MAX6675_SPEED_BITS (_BV(SPR0))
+    #endif
+  #endif
+
+  #if ENABLED(HEATER_3_USES_MAX6675)
+    #if ENABLED(HEATER_3_MAX6675_IS_MAX31855)
+      uint32_t max6675_h3_temp = 2000;
+      #define HEATER_3_MAX6675_ERROR_MASK 7
+      #define HEATER_3_MAX6675_DISCARD_BITS 18
+      #define HEATER_3_MAX6675_SPEED_BITS (_BV(SPR1))
+    #else
+      uint16_t max6675_h3_temp = 2000;
+      #define HEATER_3_MAX6675_ERROR_MASK 4
+      #define HEATER_3_MAX6675_DISCARD_BITS 3
+      #define HEATER_3_MAX6675_SPEED_BITS (_BV(SPR0))
+    #endif
+  #endif
+
+  void temp_measure_error(const uint16_t error_bits, const uint8_t error_mask) {
+    SERIAL_ERROR_START;
+    SERIAL_ERRORPGM("Temp measurement error! ");
+    #if ENABLED(HEATER_0_MAX6675_IS_MAX31855) || ENABLED(HEATER_1_MAX6675_IS_MAX31855) || ENABLED(HEATER_2_MAX6675_IS_MAX31855) || ENABLED(HEATER_3_MAX6675_IS_MAX31855)
+      if (error_mask == 7) {
+        SERIAL_ERRORPGM("MAX31855 ");
+        if (TEST(error_bits, 0))
+          SERIAL_ERRORLNPGM("Open Circuit");
+        else if (TEST(error_bits, 1))
+          SERIAL_ERRORLNPGM("Short to GND");
+        else if (TEST(error_bits, 2))
+          SERIAL_ERRORLNPGM("Short to VCC");
+      }
+      else
+    #else
+      UNUSED(error_mask);
+    #endif
+        SERIAL_ERRORLNPGM("MAX6675");
+  }
+
+  #define GET_THERM_STATE(N) do{ \
+    WRITE(HEATER_##N##_MAX6675_SS, LOW); \
+    asm("nop\nnop"); \
+    max6675_h##N##_temp = 0; \
+    for (uint8_t i = sizeof(max6675_h##N##_temp); i--;) { \
+      SPDR = 0; \
+      for (;!TEST(SPSR, SPIF);); \
+      max6675_h##N##_temp |= SPDR; \
+      if (i > 0) max6675_h##N##_temp <<= 8; \
+    } \
+    WRITE(HEATER_##N##_MAX6675_SS, HIGH); \
+    if (max6675_h##N##_temp & HEATER_##N##_MAX6675_ERROR_MASK) { \
+      temp_measure_error((uint16_t)max6675_h##N##_temp, HEATER_##N##_MAX6675_ERROR_MASK); \
+      max6675_h##N##_temp = HEATER_##N##_MAX6675_TMAX * 4; \
+    } \
+    else \
+      max6675_h##N##_temp >>= HEATER_##N##_MAX6675_DISCARD_BITS; \
+  }while(0)
+
+  #define GET_NEGATIVE_TEMP(N) do{ \
+    if (max6675_h##N##_temp & 0x00002000) \
+      max6675_h##N##_temp |= 0xFFFFC000; \
+  }while(0)
+
+  #define WRITE_SCPR(N) SPCR = _BV(MSTR) | _BV(SPE) | HEATER_##N##_MAX6675_SPEED_BITS;
+
+  int Temperature::read_max6675(uint8_t e) {
+
+    static millis_t next_max6675_ms[HOTENDS] = { 0 };
 
     millis_t ms = millis();
 
-    if (PENDING(ms, next_max6675_ms)) return (int)max6675_temp;
+    if (PENDING(ms, next_max6675_ms[e])) {
+      switch (e) {
+        #if ENABLED(HEATER_0_USES_MAX6675)
+          case 0: return (int)max6675_h0_temp;
+        #endif
+        #if ENABLED(HEATER_1_USES_MAX6675)
+          case 1: return (int)max6675_h1_temp;
+        #endif
+        #if ENABLED(HEATER_2_USES_MAX6675)
+          case 2: return (int)max6675_h2_temp;
+        #endif
+        #if ENABLED(HEATER_3_USES_MAX6675)
+          case 3: return (int)max6675_h3_temp;
+        #endif
+      }
+    }
 
-    next_max6675_ms = ms + MAX6675_HEAT_INTERVAL;
+    next_max6675_ms[e] = ms + MAX6675_HEAT_INTERVAL;
 
     CBI(
       #ifdef PRR
@@ -1616,48 +1767,49 @@ void Temperature::disable_all_heaters() {
         PRR0
       #endif
         , PRSPI);
-    SPCR = _BV(MSTR) | _BV(SPE) | MAX6675_SPEED_BITS;
-
-    WRITE(MAX6675_SS, 0); // enable TT_MAX6675
-
-    DELAY_100NS;          // Ensure 100ns delay
 
     // Read a big-endian temperature value
-    max6675_temp = 0;
-    for (uint8_t i = sizeof(max6675_temp); i--;) {
-      max6675_temp |= max6675_spi.receive();
-      if (i > 0) max6675_temp <<= 8; // shift left if not the last byte
-    }
-
-    WRITE(MAX6675_SS, 1); // disable TT_MAX6675
-
-    if (max6675_temp & MAX6675_ERROR_MASK) {
-      SERIAL_ERROR_START();
-      SERIAL_ERRORPGM("Temp measurement error! ");
-      #if MAX6675_ERROR_MASK == 7
-        SERIAL_ERRORPGM("MAX31855 ");
-        if (max6675_temp & 1)
-          SERIAL_ERRORLNPGM("Open Circuit");
-        else if (max6675_temp & 2)
-          SERIAL_ERRORLNPGM("Short to GND");
-        else if (max6675_temp & 4)
-          SERIAL_ERRORLNPGM("Short to VCC");
-      #else
-        SERIAL_ERRORLNPGM("MAX6675");
+    switch (e) {
+      #if ENABLED(HEATER_0_USES_MAX6675)
+        case 0:
+            WRITE_SCPR(0);
+            GET_THERM_STATE(0);
+          #if ENABLED(HEATER_0_MAX6675_IS_MAX31855)
+            GET_NEGATIVE_TEMP(0);
+          #endif
+          return (int)max6675_h0_temp;
       #endif
-      max6675_temp = MAX6675_TMAX * 4; // thermocouple open
-    }
-    else
-      max6675_temp >>= MAX6675_DISCARD_BITS;
-      #if ENABLED(MAX6675_IS_MAX31855)
-        // Support negative temperature
-        if (max6675_temp & 0x00002000) max6675_temp |= 0xFFFFC000;
+      #if ENABLED(HEATER_1_USES_MAX6675)
+        case 1:
+          WRITE_SCPR(1);
+          GET_THERM_STATE(1);
+          #if ENABLED(HEATER_1_MAX6675_IS_MAX31855)
+            GET_NEGATIVE_TEMP(1);
+          #endif
+          return (int)max6675_h1_temp;
       #endif
-
-    return (int)max6675_temp;
+      #if ENABLED(HEATER_2_USES_MAX6675)
+        case 2:
+          WRITE_SCPR(2);
+          GET_THERM_STATE(2);
+          #if ENABLED(HEATER_2_MAX6675_IS_MAX31855)
+            GET_NEGATIVE_TEMP(2);
+          #endif
+          return (int)max6675_h2_temp;
+      #endif
+      #if ENABLED(HEATER_3_USES_MAX6675)
+        case 3:
+          WRITE_SCPR(3);
+          GET_THERM_STATE(3);
+          #if ENABLED(HEATER_3_MAX6675_IS_MAX31855)
+            GET_NEGATIVE_TEMP(3);
+          #endif
+          return (int)max6675_h3_temp;
+      #endif
+    }
   }
 
-#endif // HEATER_0_USES_MAX6675
+#endif // HAS_MAX6675
 
 /**
  * Get raw temperatures
@@ -1666,15 +1818,15 @@ void Temperature::set_current_temp_raw() {
   #if HAS_TEMP_ADC_0 && DISABLED(HEATER_0_USES_MAX6675)
     current_temperature_raw[0] = raw_temp_value[0];
   #endif
-  #if HAS_TEMP_ADC_1
+  #if HAS_TEMP_ADC_1 && DISABLED(HEATER_1_USES_MAX6675)
     #if ENABLED(TEMP_SENSOR_1_AS_REDUNDANT)
       redundant_temperature_raw = raw_temp_value[1];
     #else
       current_temperature_raw[1] = raw_temp_value[1];
     #endif
-    #if HAS_TEMP_ADC_2
+    #if HAS_TEMP_ADC_2 && DISABLED(HEATER_2_USES_MAX6675)
       current_temperature_raw[2] = raw_temp_value[2];
-      #if HAS_TEMP_ADC_3
+      #if HAS_TEMP_ADC_3 && DISABLED(HEATER_3_USES_MAX6675)
         current_temperature_raw[3] = raw_temp_value[3];
         #if HAS_TEMP_ADC_4
           current_temperature_raw[4] = raw_temp_value[4];
@@ -2249,11 +2401,7 @@ void Temperature::isr() {
     #define TEMPDIR(N) ((HEATER_##N##_RAW_LO_TEMP) > (HEATER_##N##_RAW_HI_TEMP) ? -1 : 1)
 
     int constexpr temp_dir[] = {
-      #if ENABLED(HEATER_0_USES_MAX6675)
-         0
-      #else
-        TEMPDIR(0)
-      #endif
+      TEMPDIR(0)
       #if HOTENDS > 1
         , TEMPDIR(1)
         #if HOTENDS > 2
